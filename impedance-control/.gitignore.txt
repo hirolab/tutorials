@@ -1,8 +1,0 @@
-*/data
-data
-slprj
-*/slprj
-*.asv
-*.swp
-*.autosave
-*.slxc

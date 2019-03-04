@@ -1,0 +1,8 @@
+# ignore extraneous Simulink files 
+
+slprj
+*\slprj
+*.asv
+*.swp
+*.autosave
+*.slxc

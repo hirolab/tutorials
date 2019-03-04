@@ -23,7 +23,7 @@ __*When is impedance control used in robotics?*__
 
   Original System   |  Impedance Controlled  |
 ------------------- | -----------------------| 
-![](videos/1D_orig_sys.gif)  | ![](videos/1D_impedance_controlled.gif)     |
+![](videos/1D_orig_system.gif)  | ![](videos/1D_impedance_controlled.gif)     |
 
 ## 3. Helpful links 
 <https://www.mathworks.com/matlabcentral/fileexchange/57853-impedance-control-for-a-2-link-robot-arm-user-interactive>

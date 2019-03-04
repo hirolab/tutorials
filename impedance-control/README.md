@@ -8,6 +8,7 @@ __*What is mechanical impedance?*__
 * _One definition_ : **A force or torque generated as a result of external motion perturbations**
 * Ankle mechanical impedance can be described as a 2nd order linear system
   * Descibed as a function of the system's _inertia_, _damping_, and _stiffness_
+  > Z(s) = m(s)<sup>2</sup> + b(s) + k
   * Divided into ___intrinsic___ (joint/tendon properies) and ___extrinsic___ ankle impedance (non-linear muscle contraction)
 * Mechanical impedance is the inverse of admittance
   > Z(s) = Y(s) <sup>-1</sup> 

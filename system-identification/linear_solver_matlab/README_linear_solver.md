@@ -8,7 +8,7 @@ Scenario: In normal experiments we can measure displacement (using the mocap or 
 Our objective is the characterize the stiffness, damping, inertia, and hysteresis, as well as any force offset so it doesn't affect our data.
 Since we know how these parameters are related to each other, we can develop the equation of motion:
 
-F = x*K + dx*B + ddx*I + C*sign(dx) + G
+F = x* K + dx* B + ddx* I + C* sign(dx) + G
 
 Now we can use matrices to solve the parameters. The matrix arrangement is as follows:
 The A matrix is made up of concatanated column vectors of data over time:

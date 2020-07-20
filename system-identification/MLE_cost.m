@@ -1,16 +1,17 @@
-function cost = MLE_cost(params, hfunc, Sinv)
+function [cost, jac] = MLE_cost(params, hfunc, Sinv, Q)
 % Maximum Likelihood Estimation of impedance params
 %   Given smoothed states and covariance of error, calculate 
 %   Input:
 %       hfunc: nonlinear residual function 
 %       S: covariance of the residual
 
-res = hfunc(params);
 dlen = size(Sinv, 3);
 
 cost = 0;
+jac = zeros(1, length(params));
 for i = 1 : dlen
-    cost = cost + res(i,:) * Sinv(:,:,i) * res(i,:)' / dlen;
+    [res, grad] = hfunc(params, Q(i,:));
+    cost = cost + res' * Sinv(:,:,i) * res / dlen;
+    jac = jac + 2 * res' * Sinv(:,:,i) * grad / dlen;
 end
-
 

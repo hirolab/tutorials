@@ -1,4 +1,4 @@
-classdef KBJ_impedance_implicit_3m_imu < handle
+classdef KBJ_impedance_implicit_3m_f0 < handle
     %UNTITLED5 Summary of this class goes here
     %   Detailed explanation goes here
     
@@ -9,13 +9,13 @@ classdef KBJ_impedance_implicit_3m_imu < handle
         stiff, damp, mass, mass2
         
         Deriv_blk
-        nord = 3
+        nord = 5
     end
     
     methods
         
-        function [obj, u, y, x0, P0, x] = KBJ_impedance_implicit_3m_imu(stiff, damp, mass, mass2, ...
-                Fs, resCov, mocapCov, forceCov, imuCov, xp, xf, xs, f, xpdd, F0)
+        function [obj, u, y, x0, P0, x] = KBJ_impedance_implicit_3m_f0(stiff, damp, mass, mass2, Fs, mocapCov, forceCov, ...
+                                                                    xp, xf, xs, f, resCov, f0)
 
             n = obj.nord;
             
@@ -25,8 +25,8 @@ classdef KBJ_impedance_implicit_3m_imu < handle
             rows = (10 : dlen-10)';
             u = [xp(rows + (n+1)/2), xf(rows + (n+1)/2), xs(rows + (n+1)/2)];
             uCov = diag([mocapCov, mocapCov, mocapCov]);
-            y = [f(rows), xpdd(rows)];  % assume implicit function
-            yCov = diag([forceCov, imuCov, resCov]);
+            y = [f(rows)];  % assume implicit function
+            yCov = diag([forceCov, resCov]);
 
             x = zeros(length(rows), n*3);
             for i = 1 : n
@@ -62,14 +62,14 @@ classdef KBJ_impedance_implicit_3m_imu < handle
             obj.mass2 = mass2;
             
             % Add ankle torque as state =====================
-            x = [x, F0(rows), (F0(2)-F0(1))*ones(length(rows),1)];
+            x = [x, f0 * ones(length(rows),1), zeros(length(rows),1)];
             obj.A = blkdiag(obj.A, [1, 1; 0, 1]);
             obj.B = [obj.B; zeros(2, 3)];
 %             obj.Deriv_blk = [obj.Deriv_blk, zeros(size(obj.Deriv_blk,1), 2)];
             obj.Q = blkdiag(obj.Q, zeros(2));
             
             x0 = x(1,:)';
-            P0 = blkdiag(P0, 10*eye(2));
+            P0 = blkdiag(P0, eye(2));
         end
         
         function x2 = StateTransition(obj, x, u)
@@ -88,15 +88,13 @@ classdef KBJ_impedance_implicit_3m_imu < handle
             xs = z(7:8);
             
             f0 = x(end-1);
-            f = uy(end-1) + v(1);
-            xpdd = uy(end) + v(2);
+            f = uy(end) + v(1);
             
             params = [obj.stiff, obj.damp, obj.mass, obj.mass2];
-            res = KBJ_impedance_implicit_3m_imu.residual_fcn(...
+            res = KBJ_impedance_implicit_3m_f0.residual_fcn(...
                 params, xp(1), xp(2), xp(3), xf(1), xf(2), xf(3), xs(1), xs(2), f, f0);
 
-            h = [res + v(3)
-                 xp(3) - xpdd];
+            h = res + v(2);
         end
         
         function dfdx = StateTransitionJacobian(obj, x, u)
@@ -111,23 +109,21 @@ classdef KBJ_impedance_implicit_3m_imu < handle
             xs = z(7:8);
             
             f0 = x(end-1);
-            f = uy(end-1) + v(1);
+            f = uy(end) + v(1);
             
             params = [obj.stiff, obj.damp, obj.mass, obj.mass2];
-            [~, ~, res_z, res_f, res_f0] = KBJ_impedance_implicit_3m_imu.residual_fcn(...
+            [~, ~, res_z, res_f, res_f0] = KBJ_impedance_implicit_3m_f0.residual_fcn(...
                 params, xp(1), xp(2), xp(3), xf(1), xf(2), xf(3), xs(1), xs(2), f, f0);
              
-            dhdx = [res_z * obj.Deriv_blk, res_f0, 0
-                 [0, 0, 1, 0, 0, 0, 0, 0] * obj.Deriv_blk, 0, 0];
+            dhdx = [res_z * obj.Deriv_blk, res_f0, 0];
             
-            dhdv = [res_f, 0, 1
-                    0, -1, 0];
+            dhdv = [res_f, 1];
         end
         
         function [Sinv, Q, func] = wrap_cost_fcn(obj, X, P, U, Y)
             
             Q = [X(:,1:3*obj.nord) * obj.Deriv_blk', Y(:,1), X(:,end-1)];
-            func = @(params, Q) KBJ_impedance_implicit_3m_imu.residual_fcn(params, ...
+            func = @(params, Q) KBJ_impedance_implicit_3m_f0.residual_fcn(params, ...
                 Q(:,1), Q(:,2), Q(:,3), Q(:,4), Q(:,5), Q(:,6), Q(:,7), Q(:,8), Q(:,9), Q(:,10));
             
             nh = 1;
@@ -144,8 +140,7 @@ classdef KBJ_impedance_implicit_3m_imu < handle
     
     methods (Static)
         
-        function [res, res_par, res_q, res_f, res_f0] = residual_fcn(params, ...
-                sp, vp, ap, sf, vf, af, ss, vs, f, f0)
+        function [res, res_par, res_q, res_f, res_f0] = residual_fcn(params, sp, vp, ap, sf, vf, af, ss, vs, f, f0)
             % x: [sp, vp, ap, sf, vf, af, ss, vs]
             stiff = params(1);
             damp = params(2);

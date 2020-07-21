@@ -51,13 +51,13 @@ linkaxes([h1, h2], 'x')
 
 %% Generate measurements (2 masses)
 clear
-% rng(22)
+rng(22)
 
 dlen = 500 + 100;
 Fs = 183;
 
-stiff = 75;  
-damp = 0.9;
+stiff = 30;  
+damp = 5;
 mass = 0.02;
 stiff2 = 500;  
 damp2 = 5;
@@ -65,24 +65,25 @@ mass2 = 0.1;
 mass3 = 1;
 stiff3 = 100;
 damp3 = 10;
-f0 = 0.5;  % ankle force
 sys = ss([0, 1, 0, 0, 0, 0
           [-stiff2, -damp2, stiff2, damp2, 0, 0]/mass2
           0, 0, 0, 1, 0, 0
           [stiff2, damp2, -(stiff2+stiff), -(damp2+damp), stiff, damp]/mass
           0, 0, 0, 0, 0, 1
           [0, 0, stiff, damp, -stiff-stiff3, -damp-damp3]/mass3], ...
-          [0; 1/mass2; 0; 0; 0; 0], ...
+          [0, 0; 1/mass2, 0; 0, 0; 0, -1/mass; 0, 0; 0, 1/mass3], ...
           [[-stiff2, -damp2, stiff2, damp2, 0, 0]/mass2
           [stiff2, damp2, -(stiff2+stiff), -(damp2+damp), stiff, damp]/mass
           [0, 0, stiff, damp, -stiff-stiff3, -damp-damp3]/mass3], ...
-          [1/mass2; 0; 0]);  % KBM model, with acc measurement
+          [1/mass2, 0; 0, -1/mass; 0, 1/mass3]);  % KBM model, with acc measurement
      
 time = (0 : dlen-1)' / Fs;
 % [bf, af] = fir1(100, 20/(Fs/2));
 [bf, af] = butter(5, 25/(Fs/2));
-F = 2*filter(bf, af, randn(dlen, 1));  % band-limited white noise
-[Y, ~, X] = lsim(sys, F, time);
+f0 = 0; f1 = 0.3/1;
+F0 = polyval([f1, f0], time);
+F = 4*filter(bf, af, randn(dlen, 1));  % band-limited white noise
+[Y, ~, X] = lsim(sys, [F, F0], time);
 
 forceCov = 5e-2 ^ 2;  % force noise covariance
 mocapCov = 1e-3^2;  % mocap noise covariance
@@ -114,6 +115,7 @@ x2v = x2v(offset + (1:dlen)');
 x3v = x3v(offset + (1:dlen)');
 time = time(offset + (1:dlen)');
 x2ddv = x2ddv(offset + (1:dlen)');
+F0 = F0(offset + (1:dlen)');
 
 figure, 
 h1 = subplot(311); plot(time, [f, fv], '.-'), ylabel('Torque [Nm]')
@@ -136,7 +138,7 @@ xn = [x2, x, x3];
 
 % this results in 0
 % figure
-% plot(mass*xdd + mass2*x2dd + damp*(xd-x3d) + stiff*(x-x3) - f)
+% plot(mass*xdd + mass2*x2dd + damp*(xd-x3d) + stiff*(x-x3) - f + F0)
 
 % figure
 % plot([mass*xddz + mass2*x2ddz + damp*(xdz-x3dz) + stiff*(x(rows)-x3(rows)), f(rows)], '.-')
@@ -182,7 +184,10 @@ rows = length(bf) : (dlen-length(bf));  % remove filter transient
 regressors = [xf-x3f, qd-q3d, qdd];
 response = fvf - mass2*q2dd;
 
-lm = fitlm(regressors(rows,:), response(rows));
+regressors(rows,1) = detrend(regressors(rows,1), 1);
+response(rows,:) = detrend(response(rows,:), 1);
+
+lm = fitlm(regressors(rows,:), response(rows,:));
 figure, plot(lm)
 
 params1 = [lm.Coefficients.Estimate(2:4); mass2]
@@ -417,20 +422,24 @@ goodnessOfFit(Xk(1:end-1,:), Xn(2:end,:), 'NRMSE')
 figure, plot([yn+Hk, yn])
 
 
-%%
+%% Test dynamic system object
 
-[obj, un, yn, x0n, P0n, Xn] = KBJ_impedance_implicit_3m_aug(stiff, damp, mass, mass2, Fs, mocapCov, forceCov, imuCov, ...
-        xn(:,1), xn(:,2), xn(:,3), f, x2dd);
+% [obj, un, yn, x0n, P0n, Xn] = KBJ_impedance_implicit_3m_aug(stiff, damp, mass, mass2, Fs, mocapCov, forceCov, imuCov, ...
+%         xn(:,1), xn(:,2), xn(:,3), f, x2dd);
+% [obj, un, yn, x0n, P0n, Xn] = KBJ_impedance_implicit_3m_f0(stiff, damp, mass, mass2, ...
+%     Fs, mocapCov, forceCov, x2, x, x3, f, 0, f0);
+[obj, un, yn, x0n, P0n, Xn] = KBJ_impedance_implicit_3m_imu(stiff, damp, mass, mass2, ...
+    Fs, 0, mocapCov, forceCov, imuCov, x2, x, x3, f, x2dd, F0);
 
 Dlen = length(un);
 X = zeros(Dlen, length(x0n));
 Y = zeros(Dlen, 2);
 for i = 1 : Dlen
-    Y(i,:) = Measurement(obj, Xn(i,:)', zeros(2,1), [un(i,:), yn(i,:)]');
+    Y(i,:) = Measurement(obj, Xn(i,:)', zeros(3,1), [un(i,:), yn(i,:)]');
     X(i,:) = StateTransition(obj, Xn(i,:)', un(i,:)');
 end 
 
-figure, plot([yn+Y, yn], '.-')
+% figure, plot([yn+Y, yn], '.-')
 % figure, plot([yn+Y-yn], '.-'), ylim([-2, 2])
 % figure, plot([X(1:end-1,[3, 8, 13]), Xn(2:end,[3, 8, 13])], '.-')
 % figure, plot([X(1:end-1,[3, 8, 13])-Xn(2:end,[3, 8, 13])], '.-')
@@ -494,96 +503,44 @@ params'
 %% moderate EM (rates are states)
 % rng(1)
 
-
-
-% params = [300; 1; -0.03; mass2];
+% params = [24; 2.3; 0.025; mass2];
 params = params1;
 % params = [stiff; damp; mass; mass2];
-lb = [1; 1e-3; 1e-4; mass2];
+lb = [1; 1e-3; 1e-2; mass2];
 ub = [800; 10; 0.3; mass2];
 options = optimoptions('fmincon', 'Display', 'off', 'Algorithm', 'sqp', ...
     'UseParallel', false, 'MaxFunctionEvaluations', 3e4, ...
     'SpecifyObjectiveGradient', true, 'MaxIterations', 1e5, 'CheckGradients', false);
 
-% Xn = [x(rows+2), x(rows+1), x(rows), x(rows-1), x(rows-2)] * T';
-
-% Xn = [[x(rows+1), x(rows), x(rows-1)] * T', ...
-%       [x2(rows+1), x2(rows), x2(rows-1)] * T'];  % 3rd ===========
-% Xn = [[x(rows+3), x(rows+2), x(rows+1), x(rows), x(rows-1), x(rows-2), x(rows-3)] * T', ...
-%       [x2(rows+3), x2(rows+2), x2(rows+1), x2(rows), x2(rows-1), x2(rows-2), x2(rows-3)] * T'];
-% Xn2 = [x2(rows+2), x2(rows+1), x2(rows), x2(rows-1), x2(rows-2), ...
-%       x(rows+2), x(rows+1), x(rows), x(rows-1), x(rows-2), ...
-%       x3(rows+2), x3(rows+1), x3(rows), x3(rows-1), x3(rows-2)];
-% un2 = [x2(rows + 4), x(rows + 4), x3(rows + 4)];
-% yn2 = [f(rows), x2dd(rows)]; 
-% C = Cfun([stiff; damp; mass; mass2]);
-% res = Xn * C' + un * D' + yn * J';  % nominal everythin
-% res = Xn * C' + u * D' + y * J';  % nominal state
-% res = Xs * C' + u * D' + y * J';  % noisy everything
-%
-% Xn1 = [[x(rows+3), x(rows+2), x(rows+1), x(rows-0), x(rows-1)] * T', ...
-%       [x2(rows+3), x2(rows+2), x2(rows+1), x2(rows-0), x2(rows-1)] * T'];
-% figure, plot(Xn1 - (Xn * A' + u * B'))
-% 
-% figure
-% plot([f(rows), f(rows)-res(:,1)]), grid on
-% figure
-% plot([x2dd(rows), x2dd(rows)-res(:,2)])
-% figure, plot(res)
-
-% h = zeros(N, 2);
-% for i = 1 : N
-%     h(i,:) = spring_mass_damp_3m_residual(Xn(i,:)', un(i,:)', yn(i,:)', [stiff, damp, mass, mass2]);
-% end
-% figure, plot([yn, yn+h], '.-'), grid on
-
-% params = [stiff, damp, mass, mass2];
-% h = zeros(N, 2);
-% cost = 0;
-% for i = 1 : N
-%     [h(i,:), C, D, J] = spring_mass_damp_3m_residual(Xs(i,:)', u(i,:)', y(i,:)', params);    
-%     cost = cost + h(i,1) * Sinv(1,1,i) * h(i,1) / dlen;
-% end
-% figure, plot([yn, yn+h], '.-'), grid on
-% goodnessOfFit(yn+h, yn, 'NRMSE')
-
-
-% [hk, C, D, J] = spring_mass_damp_3m_residual(xk, u(1,:)', y(1,:), [stiff, damp, mass, mass2]);
-% R = D * uCov * D' + J * yCov * J';  % trust on the equation of motion, given in Nm
-
-% [~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m_imu(0,0,0,0, Fs, mocapCov, forceCov, imuCov, x2, x, x3, f, x2dd, 0);
-[~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m(0,0,0,0, Fs, mocapCov, forceCov, x2, x, x3, f, 0);
+[~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m_imu(0,0,0,0, Fs, 0, mocapCov, forceCov, imuCov, x2, x, x3, f, x2dd, F0);
+% [~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m_f0(0,0,0,0, Fs, mocapCov, forceCov, x2, x, x3, f, 0, f0);
+% [~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m(0,0,0,0, Fs, mocapCov, forceCov, x2, x, x3, f, 0);
 
 f1 = figure(); set(gcf, 'position', [680          76         665        1022])
 Params = params;
 Fval = NaN;
 tic
 for i = 2 : 10000
-%     hfunc = @(x, u, y) spring_mass_damp_3m_residual(x, u, y, params);
-%     [Xs, Ps, X, Ppost, E] = smooth_NLTIimplicit(A, B, Q, hfunc, uCov, yCov, u, y, xk, P);
-    
     % params = [stiff; damp; mass; mass2];
     resCov = 0.1*exp(-i/50);
-% resCov = 0;
-% resCov = 0.5*exp(-i/100);
 
-%     [obj, u, y, x0, P0, X] = KBJ_impedance_implicit_3m_imu(params(1), params(2), params(3), params(4), Fs, mocapCov, forceCov, imuCov, ...
-%         x2v, xv, x3v, fv, x2ddv, resCov);
-    [obj, u, y, x0, P0, X] = KBJ_impedance_implicit_3m(params(1), params(2), params(3), params(4), Fs, mocapCov, forceCov, ...
-        x2v, xv, x3v, fv, resCov);
+    [obj, u, y, x0, P0, X] = KBJ_impedance_implicit_3m_imu(params(1), params(2), params(3), params(4), ...
+        Fs, resCov, mocapCov, forceCov, imuCov, x2v, xv, x3v, fv, x2ddv, xv*0);
+%     [obj, u, y, x0, P0, X] = KBJ_impedance_implicit_3m_f0(params(1), params(2), params(3), params(4), ...
+%         Fs, mocapCov, forceCov, x2v, xv, x3v, fv, resCov, 0);
+%     [obj, u, y, x0, P0, X] = KBJ_impedance_implicit_3m(params(1), params(2), params(3), params(4), ...
+%         Fs, mocapCov, forceCov, x2v, xv, x3v, fv, resCov);
     [Xs, Ps, Xf, Pf] = smooth_NLTIimplicit(obj, u, y, x0, P0);
 
-%     Xs = X;
-%     Ps = Ppost;
 %     figure, plot([x2v(rows), Xs(:,3), Xn(:,3)])
 %     figure, plot([xv(rows), Xs(:,8), Xn(:,8)])
 %     figure, plot([x3v(rows), Xs(:,13), Xn(:,13)])
-% goodnessOfFit(Xs(:,[3,8,12]), Xn(:,[3,8,12]), 'NRMSE')
-% goodnessOfFit(Xf(:,[3,8,12]), Xn(:,[3,8,12]), 'NRMSE')
-% goodnessOfFit([x2v(rows), xv(rows), x3v(rows)], [x2(rows), x(rows), x3(rows)], 'NRMSE')
-% figure, plot([squeeze(Ppost(8,8,:)), squeeze(Ps(8,8,:))], '.-')
-
-% figure, plot([xv(rows), Xf(:,8), Xs(:,8), Xn(:,8)]), legend('noise', 'filt', 'smooth', 'nominal')
+%     goodnessOfFit(Xs(:,[3,8,12]), Xn(:,[3,8,12]), 'NRMSE')
+%     goodnessOfFit(Xf(:,[3,8,12]), Xn(:,[3,8,12]), 'NRMSE')
+%     goodnessOfFit([x2v(rows), xv(rows), x3v(rows)], [x2(rows), x(rows), x3(rows)], 'NRMSE')
+%     figure, plot([squeeze(Ppost(8,8,:)), squeeze(Ps(8,8,:))], '.-')
+% 
+%     figure, plot([xv(rows), Xf(:,8), Xs(:,8), Xn(:,8)]), legend('noise', 'filt', 'smooth', 'nominal')
 
     [Sinv, Q, func] = wrap_cost_fcn(obj, Xs, Ps, u, y);
     fun = @(params) MLE_cost(params, func, Sinv, Q);
@@ -612,7 +569,6 @@ for i = 2 : 10000
     Fval = [Fval, fval];
     
     if mod(i, 10) == 0 || all(abs(Params(:,end-1) - params) ./ params == 0)
-    %     figure(f1);
         h1=subplot(511); plot(Params(1,:), '.-'), grid on, yline(stiff); ylim([0, max(2*stiff, max(Params(1,:)))]), title('Stiffness [Nm/rad]')
         h2=subplot(512); plot(Params(2,:), '.-'), grid on, yline(damp); ylim([0, max(2*damp, max(Params(2,:)))]), title('Damping [Nm/rad/s]')
         h3=subplot(513); plot(Params(3,:), '.-'), grid on, yline(mass); ylim([0, max(2*mass, max(Params(3,:)))]), title('Inertia [kg*m^2]')
@@ -622,7 +578,7 @@ for i = 2 : 10000
         drawnow()
     end
     
-    if all(abs(Params(:,end-1) - params) ./ params == 0) && i > 10
+    if all(abs(Params(:,end-1) - params) ./ params == 0) && i > 20
         break
     end
 end

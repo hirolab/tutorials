@@ -29,7 +29,7 @@ pba = zeros(3, num_z); % natural length
 K = zeros(3);
 B = zeros(3);
 for i = 1 : num_z
-    [d, H, Ki, Bi] = mockup_dynamics(q, a(:,i), b(:,i), stiff(i), damp(i), eabs(i));
+    [d, H, Ki, Bi] = mockup_ankle(q, a(:,i), b(:,i), stiff(i), damp(i), eabs(i));
 %     pb(:,i) = a(:,i) + Rz(Bet(i))*Rx(Alf(i)) * [0; D(i); 0];
 %     pba(:,i) = a(:,i) + Rz(Bet(i))*Rx(Alf(i)) * [0; piston_len(i); 0];
     

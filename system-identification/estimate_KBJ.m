@@ -428,18 +428,20 @@ figure, plot([yn+Hk, yn])
 %         xn(:,1), xn(:,2), xn(:,3), f, x2dd);
 % [obj, un, yn, x0n, P0n, Xn] = KBJ_impedance_implicit_3m_f0(stiff, damp, mass, mass2, ...
 %     Fs, mocapCov, forceCov, x2, x, x3, f, 0, f0);
-[obj, un, yn, x0n, P0n, Xn] = KBJ_impedance_implicit_3m_imu(stiff, damp, mass, mass2, ...
+% [obj, un, yn, x0n, P0n, Xn] = KBJ_impedance_implicit_3m_imu(stiff, damp, mass, mass2, ...
+%     Fs, 0, mocapCov, forceCov, imuCov, x2, x, x3, f, x2dd, F0);
+[obj, un, yn, x0n, P0n, Xn] = KBJ_impedance_implicit_3m_imu_Xerror(stiff, damp, mass, mass2, ...
     Fs, 0, mocapCov, forceCov, imuCov, x2, x, x3, f, x2dd, F0);
 
 Dlen = length(un);
 X = zeros(Dlen, length(x0n));
 Y = zeros(Dlen, 2);
 for i = 1 : Dlen
-    Y(i,:) = Measurement(obj, Xn(i,:)', zeros(3,1), [un(i,:), yn(i,:)]');
+    Y(i,:) = Measurement(obj, Xn(i,:)', zeros(3,1), yn(i,:)', i);
     X(i,:) = StateTransition(obj, Xn(i,:)', un(i,:)');
 end 
 
-% figure, plot([yn+Y, yn], '.-')
+figure, plot([yn+Y, yn], '.-')
 % figure, plot([yn+Y-yn], '.-'), ylim([-2, 2])
 % figure, plot([X(1:end-1,[3, 8, 13]), Xn(2:end,[3, 8, 13])], '.-')
 % figure, plot([X(1:end-1,[3, 8, 13])-Xn(2:end,[3, 8, 13])], '.-')
@@ -512,7 +514,8 @@ options = optimoptions('fmincon', 'Display', 'off', 'Algorithm', 'sqp', ...
     'UseParallel', false, 'MaxFunctionEvaluations', 3e4, ...
     'SpecifyObjectiveGradient', true, 'MaxIterations', 1e5, 'CheckGradients', false);
 
-[~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m_imu(0,0,0,0, Fs, 0, mocapCov, forceCov, imuCov, x2, x, x3, f, x2dd, F0);
+[~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m_imu_Xerror(0,0,0,0, Fs, 0, mocapCov, forceCov, imuCov, x2, x, x3, f, x2dd, F0);
+% [~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m_imu(0,0,0,0, Fs, 0, mocapCov, forceCov, imuCov, x2, x, x3, f, x2dd, F0);
 % [~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m_f0(0,0,0,0, Fs, mocapCov, forceCov, x2, x, x3, f, 0, f0);
 % [~, un, yn, ~, ~, Xn] = KBJ_impedance_implicit_3m(0,0,0,0, Fs, mocapCov, forceCov, x2, x, x3, f, 0);
 
@@ -524,6 +527,8 @@ for i = 2 : 10000
     % params = [stiff; damp; mass; mass2];
     resCov = 0.1*exp(-i/50);
 
+%     [obj, u, y, x0, P0, X] = KBJ_impedance_implicit_3m_imu_Xerror(params(1), params(2), params(3), params(4), ...
+%         Fs, resCov, mocapCov, forceCov, imuCov, x2v, xv, x3v, fv, x2ddv, xv*0);
     [obj, u, y, x0, P0, X] = KBJ_impedance_implicit_3m_imu(params(1), params(2), params(3), params(4), ...
         Fs, resCov, mocapCov, forceCov, imuCov, x2v, xv, x3v, fv, x2ddv, xv*0);
 %     [obj, u, y, x0, P0, X] = KBJ_impedance_implicit_3m_f0(params(1), params(2), params(3), params(4), ...

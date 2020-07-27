@@ -39,22 +39,47 @@ simplify(B - B.')  % equals zero for any parameter value
 matlabFunction(d, H, K, B, 'File', 'mockup_ankle', 'vars', {q, a, b, stiff, damp, eabs})
 
 %% Define an ankle mockup configuration and viz
-a = [[28e-3;65e-3;0], [-28e-3;65e-3;0], [0;65e-3;28e-3], [0;65e-3;-28e-3]];
-b = [[40e-3;-14e-3;0], [-40e-3;-14e-3;0], [0;-14e-3;41e-3], [0;-14e-3;-41e-3]];
+% a = [[28e-3;65e-3;0], [-28e-3;65e-3;0], [0;65e-3;28e-3], [0;65e-3;-28e-3]];
+% b = [[40e-3;-14e-3;0], [-40e-3;-14e-3;0], [0;-14e-3;41e-3], [0;-14e-3;-41e-3]];
+% q = [0;0;0];
+% stiff = [347,347,347,347];
+% damp = [0,0,0,0];
+% eabs = [1,1,1,1] * (70e-3 + 36e-3);  % natural length
+% % compression =============
+% by = -5e-3;
+% br = 40e-3;
+% ay = 10e-3;
+% ar = 40e-3;
+% a = [[ar;ay;0], [-ar;ay;0], [0;ay;ar], [0;ay;-ar]];
+% b = [[br;by;0], [-br;by;0], [0;by;br], [0;by;-br]];
+% q = [0;0;0];
+% stiff = 300*[347,347,347,347];
+% damp = [0,0,0,0];
+% eabs = [1,1,1,1] * (20e-3);  % natural length
+
+ay = 60e-3;
+ar = 15e-3;
+by = 10e-3; %-20e-3;
+br = 55e-3;
+
+a = [[ar;ay;0], [-ar;ay;0], [0;ay;ar], [0;ay;-ar]];
+b = [[br;by;0], [-br;by;0], [0;by;br], [0;by;-br]];
 q = [0;0;0];
-stiff = [347,347,347,347];
+stiff = 1*[347,347,347,347];
 damp = [0,0,0,0];
-eabs = [1,1,1,1] * (70e-3 + 36e-3);  % natural length
+eabs = [1,1,1,1] * (145e-3);  % natural length
+
+
 
 Kankle = zeros(3);  % summed effect of all springs/dampers
 Bankle = zeros(3);
 for i = 1 : 4  % lopp tru each spring
-    [~, ~, K, B] = mockup_dynamics(q, a(:,i), b(:,i), stiff(i), damp(i), eabs(i));
+    [~, ~, K, B] = mockup_ankle(q, a(:,i), b(:,i), stiff(i), damp(i), eabs(i));
     Kankle = Kankle + K;
     Bankle = Bankle + B;
 end
-Kankle, Bankle
+Kankle, %Bankle
 
-figure, plot_3d_prosthesis(q, a, b, stiff, damp, eabs);
+figure, plot_3d_ankle(q, a, b, stiff, damp, eabs);
 
 

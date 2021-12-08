@@ -81,5 +81,100 @@ cam = CentralCamera('focal', 0.015, 'pixel', 10e-6, ...
 'distortion', [k1 k2 k3 p1 p2] )
 
 
-%%
+%% 11.2.1 Camera Calibration
+P = mkcube(0.2);
+T_unknown = SE3(0.1, 0.2, 1.5) * SE3.rpy(0.1, 0.2, 0.3);
+cam = CentralCamera('focal', 0.015, ...
+'pixel', 10e-6, 'resolution', [1280 1024], 'noise', 0.05);
+p = cam.project(P, 'objpose', T_unknown);
+
+C = camcald(P, p)
+
+%maximum residual is expressed and matric C is the camera matrix
+%% Chapter 11.2.2  Decomposing the Camera Calibration Matrix
+null(C)' % is the world origin of the camera frame
+h2e(ans)' %expressed in cartesian form 
+T_unknown.inv.t' %close to the true value
+est = invcamcal(C) %recover other camera parameters from camera matrix WOW!
+%which returns a CentralCamera object with its parameters set to values that result
+%in the same camera matrix. We note immediately that the focal length is very large
+%compared to the true focal length of our lens which was 0.015 m, and that the pixel
+% sizes are very large. From Eq. 11.9 we see that focal length and pixel dimensions always
+% appear together as factors f /?w and f /? h. The function invcamcal has set
+% ?w= 1 but the ratios of the estimated parameters
+
+est.f/est.rho(1) % ratio comparison of estimate
+cam.f/cam.rho(2) % and true
+
+% this following code shows the error between the estimates in the camera
+% world position
+hold on; plot_sphere(P, 0.03, 'r')
+trplot(eye(4,4), 'frame', 'T', 'color', 'b', 'length', 0.3)
+
+est.plot_camera()
+
+%% 11.2.3 Pose Estimation
+
+cam = CentralCamera('focal', 0.015, 'pixel', 10e-6, ...
+'resolution', [1280 1024], 'centre', [640 512]); % camera with known paramers
+
+P = mkcube(0.2); % we want to determine the pose of the cube
+
+T_unknown = SE3(0.1, 0.2, 1.5) * SE3.rpy(0.1, 0.2, 0.3);
+T_unknown.print
+p = cam.project(P, 'objpose', T_unknown);
+
+T_est = cam.estpose(P, p).print
+
+%% 11.2.4 Camera Calibration Toolbox
+addpath('C:\Users\hirolab\Documents\MATLAB\Computer Vision Training\TOOLBOX_calib')
+calib_gui  %Launches Calibration Toolbox GUI
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
